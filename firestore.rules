@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow create: if isSelf(uid);
+      allow update: if isSelf(uid);
+    }
+
+    match /helperProfiles/{uid} {
+      allow read: if true;
+      allow write: if isSelf(uid);
+    }
+
+    match /requests/{requestId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.clientId == request.auth.uid;
+      allow update: if signedIn()
+        && resource.data.clientId == request.auth.uid;
+
+      match /bids/{bidId} {
+        allow read: if signedIn()
+          && (resource.data.clientId == request.auth.uid
+            || resource.data.helperId == request.auth.uid);
+        // Prefer Admin SDK / API routes for bid create + status transitions
+        allow write: if false;
+      }
+    }
+
+    match /jobs/{jobId} {
+      allow read: if signedIn()
+        && (resource.data.clientId == request.auth.uid
+          || resource.data.helperId == request.auth.uid);
+      allow write: if false;
+    }
+
+    match /chats/{chatId} {
+      allow read: if signedIn()
+        && (resource.data.clientId == request.auth.uid
+          || resource.data.helperId == request.auth.uid);
+
+      match /messages/{messageId} {
+        allow read: if signedIn();
+        allow create: if signedIn()
+          && request.resource.data.senderId == request.auth.uid;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
