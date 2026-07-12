@@ -1,19 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/auth-context";
+import { canAccessRole } from "@/lib/firebase/users";
 import {
   BookOpen,
   Briefcase,
   History,
   Inbox,
   LayoutDashboard,
+  LogOut,
   MessageSquare,
   PlusCircle,
   Settings,
   Wallet,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 type NavItem = {
   href: string;
@@ -50,7 +54,21 @@ export function DashboardShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { profile, firebaseReady, logOut } = useAuth();
   const nav = role === "client" ? clientNav : helperNav;
+
+  const displayName = profile?.displayName ?? "Guest";
+  const canSwitch =
+    !profile ||
+    profile.role === "both" ||
+    profile.role === "admin" ||
+    canAccessRole(profile.role, role === "client" ? "helper" : "client");
+
+  async function handleLogout() {
+    await logOut();
+    router.replace("/auth");
+  }
 
   return (
     <div className="min-h-screen bg-[#f7f3fc]">
@@ -62,15 +80,33 @@ export function DashboardShell({
             </span>
             <span className="font-display text-xl text-purple-950">Kuro</span>
           </Link>
-          <div className="flex items-center gap-3 text-sm">
-            <Link
-              href={role === "client" ? "/helper" : "/client"}
-              className="text-purple-700 hover:underline"
-            >
-              Switch to {role === "client" ? "helper" : "client"}
-            </Link>
-            <span className="hidden text-stone-400 sm:inline">|</span>
-            <span className="hidden text-stone-600 sm:inline">Demo session</span>
+          <div className="flex items-center gap-2 text-sm sm:gap-3">
+            {canSwitch ? (
+              <Link
+                href={role === "client" ? "/helper" : "/client"}
+                className="hidden text-purple-700 hover:underline sm:inline"
+              >
+                Switch to {role === "client" ? "helper" : "client"}
+              </Link>
+            ) : null}
+            <span className="hidden max-w-[140px] truncate text-stone-600 sm:inline">
+              {displayName}
+            </span>
+            {firebaseReady && profile ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLogout}
+                className="gap-1.5"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Log out</span>
+              </Button>
+            ) : (
+              <Link href="/auth" className="text-purple-700 hover:underline">
+                Log in
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -79,6 +115,9 @@ export function DashboardShell({
         <aside className="h-fit rounded-2xl border border-purple-100 bg-white p-3 shadow-sm">
           <p className="mb-2 px-3 font-display text-lg text-purple-900 capitalize">
             {role}
+          </p>
+          <p className="mb-3 truncate px-3 text-xs text-stone-500 sm:hidden">
+            {displayName}
           </p>
           <nav className="space-y-1">
             {nav.map((item) => {

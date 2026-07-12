@@ -1,36 +1,89 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { isFirebaseConfigured } from "@/lib/firebase/client";
+import { useAuth } from "@/contexts/auth-context";
+import { defaultDashboardPath } from "@/lib/firebase/users";
+import type { UserRole } from "@/lib/types";
 
 export function AuthForm() {
   const params = useSearchParams();
+  const router = useRouter();
+  const { firebaseReady, loading, firebaseUser, profile, signIn, signUp, clearError } =
+    useAuth();
+
   const initialMode = params.get("mode") === "signup" ? "signup" : "login";
   const initialRole = params.get("role") === "helper" ? "helper" : "client";
+  const next = params.get("next");
 
   const [mode, setMode] = useState<"login" | "signup">(initialMode);
-  const [role, setRole] = useState<"client" | "helper" | "both">(initialRole);
+  const [role, setRole] = useState<UserRole>(initialRole);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const firebaseReady = useMemo(() => isFirebaseConfigured(), []);
+  useEffect(() => {
+    if (loading || !firebaseUser || !profile) return;
+    const target =
+      next && next.startsWith("/")
+        ? next
+        : defaultDashboardPath(profile.role);
+    router.replace(target);
+  }, [loading, firebaseUser, profile, next, router]);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setMessage(null);
+    clearError();
+
     if (!firebaseReady) {
       setMessage(
-        "Firebase is not configured yet. Use the demo dashboards below, or add keys to .env.local."
+        "Firebase is not configured. Add keys to .env.local and restart the dev server."
       );
       return;
     }
-    setMessage("Firebase auth wiring is ready — connect signIn methods next.");
+
+    setSubmitting(true);
+    try {
+      if (mode === "signup") {
+        if (!name.trim()) {
+          setMessage("Please enter your full name.");
+          return;
+        }
+        const p = await signUp({
+          email,
+          password,
+          displayName: name,
+          role,
+        });
+        router.replace(
+          next && next.startsWith("/") ? next : defaultDashboardPath(p.role)
+        );
+      } else {
+        const p = await signIn({ email, password });
+        router.replace(
+          next && next.startsWith("/") ? next : defaultDashboardPath(p.role)
+        );
+      }
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="hero-glow flex min-h-screen items-center justify-center">
+        <p className="font-display text-2xl text-purple-900">Loading…</p>
+      </div>
+    );
   }
 
   return (
@@ -57,6 +110,13 @@ export function AuthForm() {
             </p>
           </CardHeader>
           <CardContent>
+            {!firebaseReady ? (
+              <p className="mb-4 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                Firebase env vars missing. Copy `.env.example` to `.env.local`
+                and restart `npm run dev`.
+              </p>
+            ) : null}
+
             <form onSubmit={handleSubmit} className="space-y-4">
               {mode === "signup" ? (
                 <>
@@ -69,6 +129,7 @@ export function AuthForm() {
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Ada Okonkwo"
                       required
+                      autoComplete="name"
                     />
                   </div>
                   <div>
@@ -111,6 +172,7 @@ export function AuthForm() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@email.com"
                   required
+                  autoComplete="email"
                 />
               </div>
               <div>
@@ -124,17 +186,31 @@ export function AuthForm() {
                   placeholder="••••••••"
                   required
                   minLength={6}
+                  autoComplete={
+                    mode === "login" ? "current-password" : "new-password"
+                  }
                 />
               </div>
 
               {message ? (
-                <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                <p className="rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-800">
                   {message}
                 </p>
               ) : null}
 
-              <Button type="submit" className="w-full" size="lg">
-                {mode === "login" ? "Log in" : "Sign up"}
+              <Button
+                type="submit"
+                className="w-full"
+                size="lg"
+                disabled={submitting || !firebaseReady}
+              >
+                {submitting
+                  ? mode === "login"
+                    ? "Logging in…"
+                    : "Creating account…"
+                  : mode === "login"
+                    ? "Log in"
+                    : "Sign up"}
               </Button>
             </form>
 
@@ -145,7 +221,10 @@ export function AuthForm() {
                   <button
                     type="button"
                     className="text-purple-700 hover:underline"
-                    onClick={() => setMode("signup")}
+                    onClick={() => {
+                      setMode("signup");
+                      setMessage(null);
+                    }}
                   >
                     Create an account
                   </button>
@@ -156,7 +235,10 @@ export function AuthForm() {
                   <button
                     type="button"
                     className="text-purple-700 hover:underline"
-                    onClick={() => setMode("login")}
+                    onClick={() => {
+                      setMode("login");
+                      setMessage(null);
+                    }}
                   >
                     Log in
                   </button>
@@ -164,23 +246,11 @@ export function AuthForm() {
               )}
             </p>
 
-            <div className="mt-6 space-y-2 border-t border-purple-50 pt-5">
-              <p className="text-center text-xs text-stone-500">
-                Demo access (no auth required)
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <Link href="/client">
-                  <Button variant="outline" className="w-full" size="sm">
-                    Client demo
-                  </Button>
-                </Link>
-                <Link href="/helper">
-                  <Button variant="outline" className="w-full" size="sm">
-                    Helper demo
-                  </Button>
-                </Link>
-              </div>
-            </div>
+            <p className="mt-6 border-t border-purple-50 pt-5 text-center text-xs text-stone-500">
+              Enable <strong>Email/Password</strong> in Firebase Console →
+              Authentication → Sign-in method. Create a Firestore database if
+              you have not already.
+            </p>
           </CardContent>
         </Card>
       </div>

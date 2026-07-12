@@ -1,13 +1,18 @@
+"use client";
+
 import Link from "next/link";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { RequestStatusBadge, JobStatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/contexts/auth-context";
 import { mockJobs, mockRequests, mockBids } from "@/lib/mock-data";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { ArrowRight, PlusCircle } from "lucide-react";
 
 export default function ClientOverviewPage() {
+  const { profile } = useAuth();
+  const firstName = profile?.displayName?.split(" ")[0] || "there";
   const openRequests = mockRequests.filter((r) => r.status === "open");
   const activeJobs = mockJobs.filter((j) => j.status !== "completed");
   const pendingBids = mockBids.filter((b) => b.status === "pending");
@@ -15,7 +20,7 @@ export default function ClientOverviewPage() {
   return (
     <DashboardShell
       role="client"
-      title="Welcome back, Ada"
+      title={`Welcome back, ${firstName}`}
       subtitle="Post a request, bid on up to three helpers, and track your sessions."
     >
       <div className="mb-6 grid gap-4 sm:grid-cols-3">

@@ -1,7 +1,14 @@
+"use client";
+
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/auth-context";
+import { defaultDashboardPath } from "@/lib/firebase/users";
 
 export function SiteHeader() {
+  const { firebaseUser, profile, loading } = useAuth();
+  const dash = profile ? defaultDashboardPath(profile.role) : "/client";
+
   return (
     <header className="sticky top-0 z-40 border-b border-purple-100/80 bg-[#faf7ff]/90 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
@@ -27,14 +34,27 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <Link href="/auth">
-            <Button variant="ghost" size="sm">
-              Log in
-            </Button>
-          </Link>
-          <Link href="/auth?mode=signup">
-            <Button size="sm">Get started</Button>
-          </Link>
+          {!loading && firebaseUser && profile ? (
+            <>
+              <span className="hidden text-sm text-stone-600 sm:inline">
+                {profile.displayName}
+              </span>
+              <Link href={dash}>
+                <Button size="sm">Dashboard</Button>
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link href="/auth">
+                <Button variant="ghost" size="sm">
+                  Log in
+                </Button>
+              </Link>
+              <Link href="/auth?mode=signup">
+                <Button size="sm">Get started</Button>
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </header>

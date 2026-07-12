@@ -11,13 +11,20 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if signedIn();
-      allow create: if isSelf(uid);
-      allow update: if isSelf(uid);
+      allow create: if isSelf(uid)
+        && request.resource.data.keys().hasAll(['email', 'displayName', 'role', 'createdAt'])
+        && request.resource.data.email is string
+        && request.resource.data.displayName is string
+        && request.resource.data.role in ['client', 'helper', 'both', 'admin'];
+      allow update: if isSelf(uid)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])
+            || resource.data.role == request.resource.data.role);
     }
 
     match /helperProfiles/{uid} {
       allow read: if true;
-      allow write: if isSelf(uid);
+      allow create: if isSelf(uid);
+      allow update: if isSelf(uid);
     }
 
     match /requests/{requestId} {

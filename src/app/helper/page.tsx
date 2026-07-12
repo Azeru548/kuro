@@ -1,13 +1,18 @@
+"use client";
+
 import Link from "next/link";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { JobStatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/contexts/auth-context";
 import { mockBids, mockJobs } from "@/lib/mock-data";
 import { formatCurrency } from "@/lib/utils";
 import { Inbox } from "lucide-react";
 
 export default function HelperOverviewPage() {
+  const { profile } = useAuth();
+  const firstName = profile?.displayName?.split(" ")[0] || "Helper";
   const pending = mockBids.filter((b) => b.status === "pending");
   const myJobs = mockJobs.filter((j) => j.helperId === "helper-2" || j.helperId === "helper-1");
   const active = myJobs.filter((j) => j.status !== "completed");
@@ -18,7 +23,7 @@ export default function HelperOverviewPage() {
   return (
     <DashboardShell
       role="helper"
-      title="Helper dashboard"
+      title={`Welcome, ${firstName}`}
       subtitle="Review bids, manage projects, and keep chats on Kuro."
     >
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
