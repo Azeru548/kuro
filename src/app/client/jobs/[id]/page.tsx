@@ -8,6 +8,7 @@ import { JobStatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/auth-context";
+import { chatIdFor } from "@/lib/firebase/chat";
 import { getFirebaseDb, isFirebaseConfigured } from "@/lib/firebase/client";
 import { getJob, jobStatusStepIndex } from "@/lib/firebase/jobs";
 import type { Job } from "@/lib/types";
@@ -124,10 +125,19 @@ export default function ClientJobDetailPage() {
       title={job.title}
       subtitle={`with ${job.helperName}`}
     >
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={() => void load()}>
           Refresh
         </Button>
+        <Link
+          href={`/client/messages?chat=${encodeURIComponent(
+            chatIdFor(job.requestId, job.helperId)
+          )}`}
+        >
+          <Button variant="secondary" size="sm">
+            Open chat
+          </Button>
+        </Link>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">

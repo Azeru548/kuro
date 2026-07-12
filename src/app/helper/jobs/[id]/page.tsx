@@ -8,6 +8,7 @@ import { JobStatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/auth-context";
+import { chatIdFor } from "@/lib/firebase/chat";
 import { getFirebaseDb, isFirebaseConfigured } from "@/lib/firebase/client";
 import {
   advanceJobStatus,
@@ -127,6 +128,18 @@ export default function HelperJobDetailPage() {
           {toast}
         </div>
       ) : null}
+
+      <div className="mb-4">
+        <Link
+          href={`/helper/messages?chat=${encodeURIComponent(
+            chatIdFor(job.requestId, job.helperId)
+          )}`}
+        >
+          <Button variant="secondary" size="sm">
+            Open chat with client
+          </Button>
+        </Link>
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>

@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/contexts/auth-context";
 import { countActiveBids, getBidForHelper } from "@/lib/bids";
 import { cancelBid, listBidsForRequest, placeBid } from "@/lib/firebase/bids";
+import { closeChat, ensureChatForBid } from "@/lib/firebase/chat";
 import { getFirebaseDb, isFirebaseConfigured } from "@/lib/firebase/client";
 import { listAvailableHelpers } from "@/lib/firebase/helpers";
 import { getRequest } from "@/lib/firebase/requests";
@@ -104,8 +105,17 @@ export default function ChooseHelpersPage() {
         offerPrice: request.offerPrice,
         existingBids: bids,
       });
+      await ensureChatForBid(db, {
+        requestId: request.id,
+        bidId: bid.id,
+        clientId: firebaseUser.uid,
+        clientName: profile.displayName,
+        helperId: helper.id,
+        helperName: helper.displayName,
+        title: request.title,
+      });
       setBids((prev) => [bid, ...prev.filter((b) => b.id !== bid.id)]);
-      show(`Bid sent to ${helper.displayName}.`);
+      show(`Bid sent to ${helper.displayName}. Chat is open in Messages.`);
     } catch (err) {
       show(err instanceof Error ? err.message : "Could not place bid.");
     } finally {
@@ -127,6 +137,7 @@ export default function ChooseHelpersPage() {
     setBusyHelperId(helperId);
     try {
       await cancelBid(db, existing.id);
+      await closeChat(db, request.id, helperId).catch(() => undefined);
       setBids((prev) =>
         prev.map((b) =>
           b.id === existing.id ? { ...b, status: "cancelled" as const } : b
@@ -178,10 +189,16 @@ export default function ChooseHelpersPage() {
                   {activeCount} / {MAX_BIDS_PER_REQUEST} bids used
                 </Badge>
                 <Link
-                  href="/client"
+                  href="/client/messages"
                   className="text-sm text-purple-700 hover:underline"
                 >
-                  Back to overview
+                  Open messages
+                </Link>
+                <Link
+                  href="/client"
+                  className="text-sm text-stone-500 hover:underline"
+                >
+                  Overview
                 </Link>
               </div>
             </CardContent>
