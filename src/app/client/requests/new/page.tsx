@@ -7,10 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/contexts/auth-context";
+import { getFirebaseDb, isFirebaseConfigured } from "@/lib/firebase/client";
+import { createRequest } from "@/lib/firebase/requests";
 import { REQUEST_CATEGORIES } from "@/lib/types";
 
 export default function NewRequestPage() {
   const router = useRouter();
+  const { profile, firebaseUser } = useAuth();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<string>(REQUEST_CATEGORIES[0]);
@@ -18,8 +22,9 @@ export default function NewRequestPage() {
   const [offerPrice, setOfferPrice] = useState("");
   const [integrity, setIntegrity] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
 
@@ -37,15 +42,47 @@ export default function NewRequestPage() {
       return;
     }
 
-    // Demo: route to helpers gallery for a seeded request id
-    // Real app: create Firestore request, then navigate to its id
-    const params = new URLSearchParams({
-      title,
-      price: String(price),
-      category,
-      deadline,
-    });
-    router.push(`/client/requests/req-1/helpers?${params.toString()}`);
+    if (!isFirebaseConfigured()) {
+      setError("Firebase is not configured. Add keys to .env.local and restart.");
+      return;
+    }
+
+    if (!firebaseUser || !profile) {
+      setError("You must be logged in to create a request.");
+      return;
+    }
+
+    const db = getFirebaseDb();
+    if (!db) {
+      setError("Could not connect to Firestore.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const request = await createRequest(db, {
+        clientId: firebaseUser.uid,
+        clientName: profile.displayName,
+        title,
+        description,
+        category,
+        deadline,
+        offerPrice: price,
+      });
+      router.push(`/client/requests/${request.id}/helpers`);
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to create request.";
+      if (msg.includes("permission") || msg.includes("Permission")) {
+        setError(
+          "Firestore permission denied. Deploy the updated firestore.rules and ensure you're logged in."
+        );
+      } else {
+        setError(msg);
+      }
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -135,11 +172,11 @@ export default function NewRequestPage() {
 
             <div>
               <label className="mb-1.5 block text-sm text-stone-700">
-                Attachments (demo)
+                Attachments (coming soon)
               </label>
               <Input type="file" multiple disabled className="opacity-60" />
               <p className="mt-1 text-xs text-stone-500">
-                Firebase Storage uploads wire up next.
+                Firebase Storage uploads wire up in a later stage.
               </p>
             </div>
 
@@ -162,8 +199,8 @@ export default function NewRequestPage() {
               </p>
             ) : null}
 
-            <Button type="submit" size="lg">
-              Continue to helpers
+            <Button type="submit" size="lg" disabled={submitting}>
+              {submitting ? "Creating…" : "Continue to helpers"}
             </Button>
           </form>
         </CardContent>

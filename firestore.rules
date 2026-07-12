@@ -30,17 +30,49 @@ service cloud.firestore {
     match /requests/{requestId} {
       allow read: if signedIn();
       allow create: if signedIn()
-        && request.resource.data.clientId == request.auth.uid;
+        && request.resource.data.clientId == request.auth.uid
+        && request.resource.data.offerPrice is number
+        && request.resource.data.offerPrice > 0
+        && request.resource.data.status == 'open';
       allow update: if signedIn()
         && resource.data.clientId == request.auth.uid;
+    }
 
-      match /bids/{bidId} {
-        allow read: if signedIn()
-          && (resource.data.clientId == request.auth.uid
-            || resource.data.helperId == request.auth.uid);
-        // Prefer Admin SDK / API routes for bid create + status transitions
-        allow write: if false;
-      }
+    // Top-level bids for simple queries by helperId / requestId / clientId
+    match /bids/{bidId} {
+      allow read: if signedIn()
+        && (resource.data.clientId == request.auth.uid
+          || resource.data.helperId == request.auth.uid);
+
+      allow create: if signedIn()
+        && request.resource.data.clientId == request.auth.uid
+        && request.resource.data.helperId is string
+        && request.resource.data.requestId is string
+        && request.resource.data.offerPrice is number
+        && request.resource.data.status == 'pending'
+        && request.resource.data.helperId != request.auth.uid;
+
+      // Client cancels pending bid
+      allow update: if signedIn()
+        && resource.data.status == 'pending'
+        && (
+          (
+            resource.data.clientId == request.auth.uid
+            && request.resource.data.status == 'cancelled'
+            && request.resource.data.clientId == resource.data.clientId
+            && request.resource.data.helperId == resource.data.helperId
+            && request.resource.data.requestId == resource.data.requestId
+          )
+          ||
+          // Helper accept / decline (Stage 3)
+          (
+            resource.data.helperId == request.auth.uid
+            && request.resource.data.status in ['accepted', 'declined']
+            && request.resource.data.helperId == resource.data.helperId
+            && request.resource.data.clientId == resource.data.clientId
+            && request.resource.data.requestId == resource.data.requestId
+          )
+        );
     }
 
     match /jobs/{jobId} {
@@ -54,6 +86,9 @@ service cloud.firestore {
       allow read: if signedIn()
         && (resource.data.clientId == request.auth.uid
           || resource.data.helperId == request.auth.uid);
+      allow create: if signedIn()
+        && (request.resource.data.clientId == request.auth.uid
+          || request.resource.data.helperId == request.auth.uid);
 
       match /messages/{messageId} {
         allow read: if signedIn();
