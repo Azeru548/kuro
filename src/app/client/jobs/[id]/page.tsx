@@ -7,11 +7,16 @@ import { DashboardShell } from "@/components/dashboard-shell";
 import { JobStatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FileUploader } from "@/components/file-uploader";
 import { useAuth } from "@/contexts/auth-context";
 import { chatIdFor } from "@/lib/firebase/chat";
 import { getFirebaseDb, isFirebaseConfigured } from "@/lib/firebase/client";
-import { getJob, jobStatusStepIndex } from "@/lib/firebase/jobs";
-import type { Job } from "@/lib/types";
+import {
+  getJob,
+  jobStatusStepIndex,
+  setJobDeliverables,
+} from "@/lib/firebase/jobs";
+import type { FileAttachment, Job } from "@/lib/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 const STEPS = ["assigned", "in_progress", "delivered", "completed"] as const;
@@ -60,6 +65,24 @@ export default function ClientJobDetailPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function onClientFilesChange(files: FileAttachment[]) {
+    if (!job) return;
+    const db = getFirebaseDb();
+    if (!db) return;
+    // Clients may add extra materials as deliverables too (shared file list)
+    const previous = job.deliverables;
+    setJob({ ...job, deliverables: files, updatedAt: new Date().toISOString() });
+    try {
+      await setJobDeliverables(db, job.id, files);
+      setPaymentNote(null);
+    } catch (err) {
+      setJob({ ...job, deliverables: previous });
+      setPaymentNote(
+        err instanceof Error ? err.message : "Failed to save files."
+      );
+    }
+  }
 
   async function payWithPaystack() {
     if (!job || !profile) return;
@@ -177,6 +200,24 @@ export default function ClientJobDetailPage() {
                 Started {formatDate(job.createdAt)} · Last update{" "}
                 {formatDate(job.updatedAt)}
               </p>
+            </div>
+
+            <div className="mt-6 space-y-4">
+              <FileUploader
+                label="Your original attachments"
+                files={job.requestAttachments ?? []}
+                readOnly
+                folder="kuro/readonly"
+                hint="No files attached to this request."
+              />
+              <FileUploader
+                label="Shared job files / deliverables"
+                files={job.deliverables ?? []}
+                onChange={(files) => void onClientFilesChange(files)}
+                folder={`kuro/jobs/${job.id}/deliverables`}
+                uploadedBy={firebaseUser?.uid}
+                hint="Add extra materials or download helper deliverables."
+              />
             </div>
           </CardContent>
         </Card>

@@ -14,6 +14,7 @@ import {
 import type {
   Bid,
   BidStatus,
+  FileAttachment,
   HelpRequest,
   Job,
   JobStatus,
@@ -39,6 +40,10 @@ export function jobStatusStepIndex(status: JobStatus): number {
   return i >= 0 ? i : 0;
 }
 
+function mapFiles(value: unknown): FileAttachment[] {
+  return Array.isArray(value) ? (value as FileAttachment[]) : [];
+}
+
 function mapJob(id: string, data: Record<string, unknown>): Job {
   return {
     id,
@@ -52,6 +57,8 @@ function mapJob(id: string, data: Record<string, unknown>): Job {
     price: Number(data.price ?? 0),
     status: (data.status as JobStatus) ?? "assigned",
     paymentStatus: (data.paymentStatus as PaymentStatus) ?? "pending",
+    requestAttachments: mapFiles(data.requestAttachments),
+    deliverables: mapFiles(data.deliverables),
     createdAt:
       typeof data.createdAt === "string"
         ? data.createdAt
@@ -84,6 +91,7 @@ function mapBid(id: string, data: Record<string, unknown>): Bid {
 }
 
 function mapRequest(id: string, data: Record<string, unknown>): HelpRequest {
+  const attachments = mapFiles(data.attachments);
   return {
     id,
     clientId: String(data.clientId ?? ""),
@@ -94,9 +102,8 @@ function mapRequest(id: string, data: Record<string, unknown>): HelpRequest {
     deadline: String(data.deadline ?? ""),
     offerPrice: Number(data.offerPrice ?? 0),
     status: (data.status as RequestStatus) ?? "open",
-    attachmentNames: Array.isArray(data.attachmentNames)
-      ? (data.attachmentNames as string[])
-      : [],
+    attachments,
+    attachmentNames: attachments.map((a) => a.name),
     createdAt:
       typeof data.createdAt === "string"
         ? data.createdAt
@@ -216,6 +223,8 @@ export async function acceptBidAndCreateJob(
 
   await batch.commit();
 
+  const requestAttachments = request.attachments ?? [];
+
   const jobPayload = {
     requestId: request.id,
     bidId: bid.id,
@@ -230,6 +239,8 @@ export async function acceptBidAndCreateJob(
     price: bid.offerPrice || request.offerPrice,
     status: "assigned" satisfies JobStatus,
     paymentStatus: "pending" satisfies PaymentStatus,
+    requestAttachments,
+    deliverables: [] as FileAttachment[],
     createdAt: now,
     updatedAt: now,
   };
@@ -257,9 +268,24 @@ export async function acceptBidAndCreateJob(
     price: bid.offerPrice || request.offerPrice,
     status: "assigned",
     paymentStatus: "pending",
+    requestAttachments,
+    deliverables: [],
     createdAt: now,
     updatedAt: now,
   };
+}
+
+export async function setJobDeliverables(
+  db: Firestore,
+  jobId: string,
+  deliverables: FileAttachment[]
+): Promise<void> {
+  const now = new Date().toISOString();
+  await updateDoc(doc(db, "jobs", jobId), {
+    deliverables,
+    updatedAt: now,
+    updatedAtServer: serverTimestamp(),
+  });
 }
 
 export async function updateJobStatus(

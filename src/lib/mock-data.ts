@@ -124,6 +124,7 @@ export const mockRequests: HelpRequest[] = [
     offerPrice: 8000,
     status: "open",
     attachmentNames: ["brief.pdf"],
+    attachments: [],
     createdAt: "2026-07-10T09:00:00Z",
   },
   {
@@ -138,6 +139,7 @@ export const mockRequests: HelpRequest[] = [
     offerPrice: 5500,
     status: "matched",
     attachmentNames: ["draft-v1.docx"],
+    attachments: [],
     createdAt: "2026-07-08T14:00:00Z",
   },
 ];
@@ -189,6 +191,8 @@ export const mockJobs: Job[] = [
     price: 5500,
     status: "in_progress",
     paymentStatus: "paid",
+    requestAttachments: [],
+    deliverables: [],
     createdAt: "2026-07-08T16:00:00Z",
     updatedAt: "2026-07-09T11:00:00Z",
   },
@@ -204,6 +208,8 @@ export const mockJobs: Job[] = [
     price: 6000,
     status: "completed",
     paymentStatus: "released",
+    requestAttachments: [],
+    deliverables: [],
     createdAt: "2026-06-01T10:00:00Z",
     updatedAt: "2026-06-02T18:00:00Z",
   },

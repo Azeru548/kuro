@@ -7,6 +7,7 @@ import { DashboardShell } from "@/components/dashboard-shell";
 import { JobStatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FileUploader } from "@/components/file-uploader";
 import { useAuth } from "@/contexts/auth-context";
 import { chatIdFor } from "@/lib/firebase/chat";
 import { getFirebaseDb, isFirebaseConfigured } from "@/lib/firebase/client";
@@ -15,8 +16,9 @@ import {
   getJob,
   jobStatusStepIndex,
   nextJobStatus,
+  setJobDeliverables,
 } from "@/lib/firebase/jobs";
-import type { Job } from "@/lib/types";
+import type { FileAttachment, Job } from "@/lib/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 const STEPS = ["assigned", "in_progress", "delivered", "completed"] as const;
@@ -88,6 +90,21 @@ export default function HelperJobDetailPage() {
       setToast(err instanceof Error ? err.message : "Update failed.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function onDeliverablesChange(files: FileAttachment[]) {
+    if (!job) return;
+    const db = getFirebaseDb();
+    if (!db) return;
+    const previous = job.deliverables;
+    setJob({ ...job, deliverables: files, updatedAt: new Date().toISOString() });
+    try {
+      await setJobDeliverables(db, job.id, files);
+      setToast("Deliverables updated.");
+    } catch (err) {
+      setJob({ ...job, deliverables: previous });
+      setToast(err instanceof Error ? err.message : "Failed to save files.");
     }
   }
 
@@ -202,16 +219,24 @@ export default function HelperJobDetailPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Deliverables</CardTitle>
+            <CardTitle>Files</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-stone-600">
-            <p>
-              Upload session notes, annotated drafts, or resource links here.
-              Firebase Storage comes in a later stage.
-            </p>
-            <div className="rounded-xl border border-dashed border-purple-200 bg-purple-50/30 px-4 py-8 text-center text-stone-500">
-              Drop files (coming soon)
-            </div>
+          <CardContent className="space-y-6 text-sm text-stone-600">
+            <FileUploader
+              label="Client brief attachments"
+              files={job.requestAttachments ?? []}
+              readOnly
+              folder="kuro/readonly"
+              hint="No brief files on this request."
+            />
+            <FileUploader
+              label="Your deliverables"
+              files={job.deliverables ?? []}
+              onChange={(files) => void onDeliverablesChange(files)}
+              folder={`kuro/jobs/${job.id}/deliverables`}
+              uploadedBy={firebaseUser?.uid}
+              hint="Session notes, annotated drafts, resources — Cloudinary."
+            />
           </CardContent>
         </Card>
       </div>

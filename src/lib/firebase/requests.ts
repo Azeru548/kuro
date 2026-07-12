@@ -10,9 +10,24 @@ import {
   where,
   type Firestore,
 } from "firebase/firestore";
-import type { HelpRequest, RequestStatus } from "@/lib/types";
+import type { FileAttachment, HelpRequest, RequestStatus } from "@/lib/types";
+
+function mapAttachments(data: Record<string, unknown>): FileAttachment[] {
+  if (Array.isArray(data.attachments)) {
+    return data.attachments as FileAttachment[];
+  }
+  if (Array.isArray(data.attachmentNames)) {
+    return (data.attachmentNames as string[]).map((name, i) => ({
+      name,
+      url: "",
+      publicId: `legacy-${i}-${name}`,
+    }));
+  }
+  return [];
+}
 
 function mapRequest(id: string, data: Record<string, unknown>): HelpRequest {
+  const attachments = mapAttachments(data);
   return {
     id,
     clientId: String(data.clientId ?? ""),
@@ -23,9 +38,8 @@ function mapRequest(id: string, data: Record<string, unknown>): HelpRequest {
     deadline: String(data.deadline ?? ""),
     offerPrice: Number(data.offerPrice ?? 0),
     status: (data.status as RequestStatus) ?? "open",
-    attachmentNames: Array.isArray(data.attachmentNames)
-      ? (data.attachmentNames as string[])
-      : [],
+    attachmentNames: attachments.map((a) => a.name),
+    attachments,
     createdAt:
       typeof data.createdAt === "string"
         ? data.createdAt
@@ -43,9 +57,11 @@ export async function createRequest(
     category: string;
     deadline: string;
     offerPrice: number;
+    attachments?: FileAttachment[];
   }
 ): Promise<HelpRequest> {
   const now = new Date().toISOString();
+  const attachments = params.attachments ?? [];
   const ref = await addDoc(collection(db, "requests"), {
     clientId: params.clientId,
     clientName: params.clientName,
@@ -55,7 +71,8 @@ export async function createRequest(
     deadline: params.deadline,
     offerPrice: params.offerPrice,
     status: "open" satisfies RequestStatus,
-    attachmentNames: [],
+    attachments,
+    attachmentNames: attachments.map((a) => a.name),
     createdAt: now,
     updatedAt: serverTimestamp(),
   });
@@ -70,7 +87,8 @@ export async function createRequest(
     deadline: params.deadline,
     offerPrice: params.offerPrice,
     status: "open",
-    attachmentNames: [],
+    attachments,
+    attachmentNames: attachments.map((a) => a.name),
     createdAt: now,
   };
 }
@@ -99,7 +117,6 @@ export async function listRequestsForClient(
       mapRequest(d.id, d.data() as Record<string, unknown>)
     );
   } catch {
-    // Fallback if composite index not ready yet
     const q2 = query(
       collection(db, "requests"),
       where("clientId", "==", clientId)

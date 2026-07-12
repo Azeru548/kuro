@@ -71,6 +71,18 @@ export interface HelperProfile {
   photoURL?: string;
 }
 
+/** Uploaded via Cloudinary */
+export interface FileAttachment {
+  name: string;
+  url: string;
+  publicId: string;
+  bytes?: number;
+  format?: string;
+  resourceType?: string;
+  uploadedAt?: string;
+  uploadedBy?: string;
+}
+
 export interface HelpRequest {
   id: string;
   clientId: string;
@@ -81,7 +93,9 @@ export interface HelpRequest {
   deadline: string;
   offerPrice: number;
   status: RequestStatus;
+  /** @deprecated prefer attachments */
   attachmentNames: string[];
+  attachments: FileAttachment[];
   createdAt: string;
 }
 
@@ -110,6 +124,10 @@ export interface Job {
   price: number;
   status: JobStatus;
   paymentStatus: PaymentStatus;
+  /** Brief files from the original request */
+  requestAttachments: FileAttachment[];
+  /** Helper/client deliverables */
+  deliverables: FileAttachment[];
   createdAt: string;
   updatedAt: string;
 }

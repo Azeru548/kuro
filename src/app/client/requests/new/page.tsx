@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FileUploader } from "@/components/file-uploader";
 import { useAuth } from "@/contexts/auth-context";
 import { getFirebaseDb, isFirebaseConfigured } from "@/lib/firebase/client";
 import { createRequest } from "@/lib/firebase/requests";
-import { REQUEST_CATEGORIES } from "@/lib/types";
+import { REQUEST_CATEGORIES, type FileAttachment } from "@/lib/types";
 
 export default function NewRequestPage() {
   const router = useRouter();
@@ -20,6 +21,7 @@ export default function NewRequestPage() {
   const [category, setCategory] = useState<string>(REQUEST_CATEGORIES[0]);
   const [deadline, setDeadline] = useState("");
   const [offerPrice, setOfferPrice] = useState("");
+  const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const [integrity, setIntegrity] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -68,6 +70,7 @@ export default function NewRequestPage() {
         category,
         deadline,
         offerPrice: price,
+        attachments,
       });
       router.push(`/client/requests/${request.id}/helpers`);
     } catch (err) {
@@ -170,15 +173,15 @@ export default function NewRequestPage() {
               </p>
             </div>
 
-            <div>
-              <label className="mb-1.5 block text-sm text-stone-700">
-                Attachments (coming soon)
-              </label>
-              <Input type="file" multiple disabled className="opacity-60" />
-              <p className="mt-1 text-xs text-stone-500">
-                Firebase Storage uploads wire up in a later stage.
-              </p>
-            </div>
+            <FileUploader
+              label="Attachments (optional)"
+              files={attachments}
+              onChange={setAttachments}
+              folder={`kuro/requests/${firebaseUser?.uid || "anon"}`}
+              uploadedBy={firebaseUser?.uid}
+              disabled={submitting}
+              hint="Briefs, screenshots, drafts — uploaded via Cloudinary."
+            />
 
             <label className="flex items-start gap-3 rounded-xl border border-purple-100 bg-purple-50/50 p-3 text-sm text-stone-700">
               <input
