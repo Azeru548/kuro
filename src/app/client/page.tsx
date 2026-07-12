@@ -9,10 +9,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/auth-context";
 import { listBidsForClient } from "@/lib/firebase/bids";
 import { getFirebaseDb, isFirebaseConfigured } from "@/lib/firebase/client";
+import { listJobsForClient } from "@/lib/firebase/jobs";
 import { listRequestsForClient } from "@/lib/firebase/requests";
-import type { Bid, HelpRequest } from "@/lib/types";
+import type { Bid, HelpRequest, Job } from "@/lib/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { ArrowRight, PlusCircle } from "lucide-react";
+import { JobStatusBadge } from "@/components/status-badge";
 
 export default function ClientOverviewPage() {
   const { profile, firebaseUser } = useAuth();
@@ -20,6 +22,7 @@ export default function ClientOverviewPage() {
 
   const [requests, setRequests] = useState<HelpRequest[]>([]);
   const [bids, setBids] = useState<Bid[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,12 +40,14 @@ export default function ClientOverviewPage() {
     setLoading(true);
     setError(null);
     try {
-      const [reqs, clientBids] = await Promise.all([
+      const [reqs, clientBids, clientJobs] = await Promise.all([
         listRequestsForClient(db, firebaseUser.uid),
         listBidsForClient(db, firebaseUser.uid),
+        listJobsForClient(db, firebaseUser.uid),
       ]);
       setRequests(reqs);
       setBids(clientBids);
+      setJobs(clientJobs);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load data.");
     } finally {
@@ -56,7 +61,7 @@ export default function ClientOverviewPage() {
 
   const openRequests = requests.filter((r) => r.status === "open");
   const pendingBids = bids.filter((b) => b.status === "pending");
-  const acceptedBids = bids.filter((b) => b.status === "accepted");
+  const activeJobs = jobs.filter((j) => j.status !== "completed");
 
   return (
     <DashboardShell
@@ -68,7 +73,7 @@ export default function ClientOverviewPage() {
         {[
           { label: "Open requests", value: openRequests.length },
           { label: "Pending bids", value: pendingBids.length },
-          { label: "Accepted bids", value: acceptedBids.length },
+          { label: "Active jobs", value: activeJobs.length },
         ].map((s) => (
           <Card key={s.label}>
             <CardContent className="py-5">
@@ -151,35 +156,66 @@ export default function ClientOverviewPage() {
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Your bids</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Active jobs</CardTitle>
+              <Link
+                href="/client/jobs"
+                className="text-xs text-purple-700 hover:underline"
+              >
+                View all
+              </Link>
             </CardHeader>
             <CardContent className="space-y-3">
-              {bids.length === 0 ? (
-                <p className="text-sm text-stone-500">
-                  No bids yet. Open a request and bid on up to three helpers.
-                </p>
-              ) : (
-                bids
-                  .slice()
-                  .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-                  .map((bid) => (
-                    <div
-                      key={bid.id}
-                      className="flex items-start justify-between gap-2 rounded-xl border border-purple-50 p-4"
-                    >
-                      <div>
-                        <p className="font-medium text-purple-950">
-                          {bid.helperName}
-                        </p>
-                        <p className="mt-1 text-xs text-stone-500">
-                          {formatCurrency(bid.offerPrice)} ·{" "}
-                          {formatDate(bid.createdAt)}
-                        </p>
-                      </div>
-                      <BidStatusBadge status={bid.status} />
+              {activeJobs.length === 0 ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-stone-500">
+                    No jobs yet. When a helper accepts your bid, it shows here.
+                  </p>
+                  {bids.length > 0 ? (
+                    <div className="space-y-2 border-t border-purple-50 pt-3">
+                      <p className="text-xs font-medium uppercase tracking-wide text-stone-500">
+                        Recent bids
+                      </p>
+                      {bids
+                        .slice()
+                        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+                        .slice(0, 4)
+                        .map((bid) => (
+                          <div
+                            key={bid.id}
+                            className="flex items-start justify-between gap-2 rounded-xl border border-purple-50 p-3"
+                          >
+                            <div>
+                              <p className="text-sm font-medium text-purple-950">
+                                {bid.helperName}
+                              </p>
+                              <p className="mt-0.5 text-xs text-stone-500">
+                                {formatCurrency(bid.offerPrice)}
+                              </p>
+                            </div>
+                            <BidStatusBadge status={bid.status} />
+                          </div>
+                        ))}
                     </div>
-                  ))
+                  ) : null}
+                </div>
+              ) : (
+                activeJobs.map((job) => (
+                  <Link
+                    key={job.id}
+                    href={`/client/jobs/${job.id}`}
+                    className="flex items-start justify-between gap-2 rounded-xl border border-purple-50 p-4 transition hover:border-purple-200 hover:bg-purple-50/40"
+                  >
+                    <div>
+                      <p className="font-medium text-purple-950">{job.title}</p>
+                      <p className="mt-1 text-xs text-stone-500">
+                        {job.helperName} · {formatCurrency(job.price)} ·{" "}
+                        {formatDate(job.updatedAt)}
+                      </p>
+                    </div>
+                    <JobStatusBadge status={job.status} />
+                  </Link>
+                ))
               )}
             </CardContent>
           </Card>

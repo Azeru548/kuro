@@ -1,19 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { BidStatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/auth-context";
-import {
-  acceptBid,
-  declineBid,
-  expireSiblingBids,
-  listBidsForHelper,
-} from "@/lib/firebase/bids";
+import { declineBid, listBidsForHelper } from "@/lib/firebase/bids";
 import { getFirebaseDb, isFirebaseConfigured } from "@/lib/firebase/client";
+import { acceptBidAndCreateJob } from "@/lib/firebase/jobs";
 import { getRequest } from "@/lib/firebase/requests";
 import {
   DECLINE_REASON_LABELS,
@@ -24,7 +22,8 @@ import {
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 export default function HelperInboxPage() {
-  const { firebaseUser } = useAuth();
+  const { firebaseUser, profile } = useAuth();
+  const router = useRouter();
   const [bids, setBids] = useState<Bid[]>([]);
   const [requestsById, setRequestsById] = useState<Record<string, HelpRequest>>(
     {}
@@ -39,7 +38,7 @@ export default function HelperInboxPage() {
 
   function notify(msg: string) {
     setToast(msg);
-    window.setTimeout(() => setToast(null), 2500);
+    window.setTimeout(() => setToast(null), 3200);
   }
 
   const load = useCallback(async () => {
@@ -83,12 +82,18 @@ export default function HelperInboxPage() {
   }, [load]);
 
   async function accept(bid: Bid) {
+    if (!firebaseUser) return;
     const db = getFirebaseDb();
     if (!db) return;
     setBusyId(bid.id);
     try {
-      await acceptBid(db, bid.id);
-      await expireSiblingBids(db, bid.requestId, bid.id, bids);
+      const job = await acceptBidAndCreateJob(db, {
+        bidId: bid.id,
+        helperId: firebaseUser.uid,
+        helperName:
+          profile?.displayName || bid.helperName || "Helper",
+      });
+
       setBids((prev) =>
         prev.map((b) => {
           if (b.id === bid.id) return { ...b, status: "accepted" as const };
@@ -98,9 +103,20 @@ export default function HelperInboxPage() {
           return b;
         })
       );
-      notify("Bid accepted. Job workspace comes in Stage 3.");
+      setRequestsById((prev) => {
+        const req = prev[bid.requestId];
+        if (!req) return prev;
+        return {
+          ...prev,
+          [bid.requestId]: { ...req, status: "matched" },
+        };
+      });
+
+      notify("Job created — opening project…");
+      router.push(`/helper/jobs/${job.id}`);
     } catch (err) {
       notify(err instanceof Error ? err.message : "Accept failed.");
+      void load();
     } finally {
       setBusyId(null);
     }
@@ -140,12 +156,17 @@ export default function HelperInboxPage() {
     <DashboardShell
       role="helper"
       title="Inbox"
-      subtitle="Clients bid on you with a fixed offer price. Accept or decline with a template reason."
+      subtitle="Accept creates a job and marks the request matched. First accept wins."
     >
       <div className="mb-4 flex gap-2">
         <Button variant="outline" size="sm" onClick={() => void load()}>
           Refresh
         </Button>
+        <Link href="/helper/jobs">
+          <Button variant="ghost" size="sm">
+            My projects
+          </Button>
+        </Link>
       </div>
 
       {toast ? (
@@ -198,16 +219,21 @@ export default function HelperInboxPage() {
                         Due {formatDate(request.deadline)}
                       </span>
                     ) : null}
+                    {request?.status === "matched" && bid.status === "pending" ? (
+                      <span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-900">
+                        Already matched
+                      </span>
+                    ) : null}
                   </div>
 
-                  {bid.status === "pending" ? (
+                  {bid.status === "pending" && request?.status === "open" ? (
                     <>
                       <div className="flex flex-wrap gap-2">
                         <Button
                           onClick={() => void accept(bid)}
                           disabled={busyId === bid.id}
                         >
-                          Accept
+                          {busyId === bid.id ? "Accepting…" : "Accept & create job"}
                         </Button>
                         <Button
                           variant="outline"
@@ -269,10 +295,25 @@ export default function HelperInboxPage() {
                         </div>
                       ) : null}
                     </>
+                  ) : bid.status === "accepted" ? (
+                    <p className="text-sm text-emerald-700">
+                      Accepted — open{" "}
+                      <Link
+                        href="/helper/jobs"
+                        className="underline hover:text-emerald-900"
+                      >
+                        My projects
+                      </Link>
+                      .
+                    </p>
                   ) : bid.status === "declined" && bid.declineReason ? (
                     <p className="text-sm text-stone-500">
                       Declined — {DECLINE_REASON_LABELS[bid.declineReason]}
                       {bid.declineNote ? `: ${bid.declineNote}` : ""}
+                    </p>
+                  ) : bid.status === "expired" ? (
+                    <p className="text-sm text-stone-500">
+                      Expired — another helper was accepted for this request.
                     </p>
                   ) : null}
                 </CardContent>
@@ -282,8 +323,7 @@ export default function HelperInboxPage() {
 
           {inbox.length === 0 ? (
             <p className="text-sm text-stone-500">
-              No bids yet. Make sure your helper profile is saved and available —
-              then wait for a client to bid on you.
+              No bids yet. Save your helper profile so clients can find you.
             </p>
           ) : null}
         </div>

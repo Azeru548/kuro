@@ -1,28 +1,67 @@
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import Link from "next/link";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { JobStatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { mockJobs } from "@/lib/mock-data";
+import { useAuth } from "@/contexts/auth-context";
+import { getFirebaseDb, isFirebaseConfigured } from "@/lib/firebase/client";
+import { getJob, jobStatusStepIndex } from "@/lib/firebase/jobs";
+import type { Job } from "@/lib/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 const STEPS = ["assigned", "in_progress", "delivered", "completed"] as const;
 
 export default function ClientJobDetailPage() {
   const params = useParams<{ id: string }>();
-  const job = mockJobs.find((j) => j.id === params.id) ?? mockJobs[0];
+  const { firebaseUser, profile } = useAuth();
+  const [job, setJob] = useState<Job | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [paymentNote, setPaymentNote] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
 
-  const stepIndex = Math.max(
-    0,
-    STEPS.indexOf(job.status as (typeof STEPS)[number])
-  );
+  const load = useCallback(async () => {
+    if (!isFirebaseConfigured()) {
+      setError("Firebase is not configured.");
+      setLoading(false);
+      return;
+    }
+    const db = getFirebaseDb();
+    if (!db) {
+      setError("Firestore unavailable.");
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const j = await getJob(db, params.id);
+      if (!j) {
+        setError("Job not found.");
+        setJob(null);
+      } else if (firebaseUser && j.clientId !== firebaseUser.uid) {
+        setError("You do not have access to this job.");
+        setJob(null);
+      } else {
+        setJob(j);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load job.");
+    } finally {
+      setLoading(false);
+    }
+  }, [params.id, firebaseUser]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   async function payWithPaystack() {
+    if (!job || !profile) return;
     setPaying(true);
     setPaymentNote(null);
     try {
@@ -30,7 +69,7 @@ export default function ClientJobDetailPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: "ada@gmail.com",
+          email: profile.email,
           amount: job.price,
           jobId: job.id,
         }),
@@ -38,7 +77,7 @@ export default function ClientJobDetailPage() {
       const json = await res.json();
       if (json.demo || res.status === 503) {
         setPaymentNote(
-          "Paystack keys not configured. Add PAYSTACK_SECRET_KEY and NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY to enable checkout."
+          "Paystack keys not configured yet (Stage 5). Add PAYSTACK keys to .env.local to enable checkout."
         );
         return;
       }
@@ -54,12 +93,43 @@ export default function ClientJobDetailPage() {
     }
   }
 
+  if (loading) {
+    return (
+      <DashboardShell role="client" title="Job" subtitle="Loading…">
+        <p className="text-sm text-stone-500">Loading job…</p>
+      </DashboardShell>
+    );
+  }
+
+  if (error || !job) {
+    return (
+      <DashboardShell role="client" title="Job" subtitle="Unavailable">
+        <Card>
+          <CardContent className="space-y-3 py-6">
+            <p className="text-sm text-rose-700">{error || "Job not found."}</p>
+            <Link href="/client/jobs">
+              <Button variant="outline">Back to jobs</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </DashboardShell>
+    );
+  }
+
+  const stepIndex = jobStatusStepIndex(job.status);
+
   return (
     <DashboardShell
       role="client"
       title={job.title}
       subtitle={`with ${job.helperName}`}
     >
+      <div className="mb-4">
+        <Button variant="outline" size="sm" onClick={() => void load()}>
+          Refresh
+        </Button>
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -119,10 +189,10 @@ export default function ClientJobDetailPage() {
               </span>
             </div>
             <p className="text-xs text-stone-500">
-              Payments are processed with Paystack. Keep conversations and files
-              on Kuro.
+              Payments use Paystack. Full verify → mark paid lands in Stage 5.
             </p>
-            {job.paymentStatus === "pending" || job.paymentStatus === "failed" ? (
+            {job.paymentStatus === "pending" ||
+            job.paymentStatus === "failed" ? (
               <Button
                 className="w-full"
                 onClick={payWithPaystack}
