@@ -32,7 +32,8 @@ export function FileUploader({
 }: {
   files: FileAttachment[];
   onChange?: (files: FileAttachment[]) => void;
-  folder: string;
+  /** Ignored for unsigned presets that pin asset folder (e.g. hauser/listings) */
+  folder?: string;
   uploadedBy?: string;
   disabled?: boolean;
   label?: string;
@@ -73,7 +74,7 @@ export function FileUploader({
       const uploaded: FileAttachment[] = [];
       for (const file of incoming) {
         const att = await uploadFileToCloudinary(file, {
-          folder,
+          folder: folder || process.env.NEXT_PUBLIC_CLOUDINARY_FOLDER || "hauser/listings",
           uploadedBy,
         });
         uploaded.push(att);

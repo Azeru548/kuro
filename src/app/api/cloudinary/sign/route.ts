@@ -16,7 +16,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error:
-            "Cloudinary cloud name missing. Set NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME.",
+            "Cloudinary cloud name missing. Set NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME in .env.local (Dashboard → copy Cloud name, e.g. dxxxxx).",
         },
         { status: 503 }
       );
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error:
-            "Cloudinary not configured. Set CLOUDINARY_API_KEY + CLOUDINARY_API_SECRET (signed) or NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET (unsigned).",
+            "Cloudinary not configured. Set NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET (unsigned) or CLOUDINARY_API_KEY + CLOUDINARY_API_SECRET (signed).",
         },
         { status: 503 }
       );
@@ -38,11 +38,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid body" }, { status: 400 });
     }
 
+    const defaultFolder =
+      process.env.NEXT_PUBLIC_CLOUDINARY_FOLDER || "hauser/listings";
     const folder =
-      parsed.data.folder?.replace(/[^a-zA-Z0-9/_-]/g, "") || "kuro/uploads";
+      parsed.data.folder?.replace(/[^a-zA-Z0-9/_-]/g, "") || defaultFolder;
     const timestamp = Math.round(Date.now() / 1000);
+    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
-    // Prefer signed uploads when secret is present
+    // Prefer unsigned preset when configured (matches hauser_preset + asset folder)
+    if (uploadPreset) {
+      return NextResponse.json({
+        mode: "unsigned" as const,
+        cloudName: getCloudinaryCloudName(),
+        timestamp,
+        // Preset already pins asset folder (hauser/listings); client may omit folder
+        folder,
+        uploadPreset,
+        usePresetFolder: true,
+      });
+    }
+
     if (process.env.CLOUDINARY_API_SECRET && process.env.CLOUDINARY_API_KEY) {
       const signature = signCloudinaryParams({ folder, timestamp });
       return NextResponse.json({
@@ -52,25 +67,14 @@ export async function POST(req: Request) {
         timestamp,
         signature,
         folder,
+        usePresetFolder: false,
       });
     }
 
-    // Unsigned preset fallback
-    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-    if (!uploadPreset) {
-      return NextResponse.json(
-        { error: "No Cloudinary credentials configured." },
-        { status: 503 }
-      );
-    }
-
-    return NextResponse.json({
-      mode: "unsigned" as const,
-      cloudName: getCloudinaryCloudName(),
-      timestamp,
-      folder,
-      uploadPreset,
-    });
+    return NextResponse.json(
+      { error: "No Cloudinary credentials configured." },
+      { status: 503 }
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Sign error";
     return NextResponse.json({ error: message }, { status: 500 });

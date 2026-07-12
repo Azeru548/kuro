@@ -233,7 +233,7 @@ export default function HelperJobDetailPage() {
               label="Your deliverables"
               files={job.deliverables ?? []}
               onChange={(files) => void onDeliverablesChange(files)}
-              folder={`kuro/jobs/${job.id}/deliverables`}
+              folder="hauser/listings"
               uploadedBy={firebaseUser?.uid}
               hint="Session notes, annotated drafts, resources — Cloudinary."
             />

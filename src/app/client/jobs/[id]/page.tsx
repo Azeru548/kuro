@@ -214,7 +214,7 @@ export default function ClientJobDetailPage() {
                 label="Shared job files / deliverables"
                 files={job.deliverables ?? []}
                 onChange={(files) => void onClientFilesChange(files)}
-                folder={`kuro/jobs/${job.id}/deliverables`}
+                folder="hauser/listings"
                 uploadedBy={firebaseUser?.uid}
                 hint="Add extra materials or download helper deliverables."
               />

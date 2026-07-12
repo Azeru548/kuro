@@ -177,7 +177,7 @@ export default function NewRequestPage() {
               label="Attachments (optional)"
               files={attachments}
               onChange={setAttachments}
-              folder={`kuro/requests/${firebaseUser?.uid || "anon"}`}
+              folder="hauser/listings"
               uploadedBy={firebaseUser?.uid}
               disabled={submitting}
               hint="Briefs, screenshots, drafts — uploaded via Cloudinary."

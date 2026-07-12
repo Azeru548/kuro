@@ -4,8 +4,8 @@ import type { FileAttachment } from "@/lib/types";
 export function isCloudinaryConfigured() {
   return Boolean(
     process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME &&
-      (process.env.CLOUDINARY_API_SECRET ||
-        process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET)
+      (process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET ||
+        (process.env.CLOUDINARY_API_SECRET && process.env.CLOUDINARY_API_KEY))
   );
 }
 
