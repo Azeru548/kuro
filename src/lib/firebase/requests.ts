@@ -10,6 +10,7 @@ import {
   where,
   type Firestore,
 } from "firebase/firestore";
+import { sanitizeAttachments } from "@/lib/sanitize";
 import type { FileAttachment, HelpRequest, RequestStatus } from "@/lib/types";
 
 function mapAttachments(data: Record<string, unknown>): FileAttachment[] {
@@ -61,7 +62,8 @@ export async function createRequest(
   }
 ): Promise<HelpRequest> {
   const now = new Date().toISOString();
-  const attachments = params.attachments ?? [];
+  // Firestore rejects `undefined` nested fields (e.g. optional Cloudinary metadata)
+  const attachments = sanitizeAttachments(params.attachments ?? []);
   const ref = await addDoc(collection(db, "requests"), {
     clientId: params.clientId,
     clientName: params.clientName,

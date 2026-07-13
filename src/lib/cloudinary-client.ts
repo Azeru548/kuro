@@ -75,14 +75,19 @@ export async function uploadFileToCloudinary(
     );
   }
 
-  return {
-    name: file.name,
-    url: data.secure_url as string,
-    publicId: data.public_id as string,
-    bytes: data.bytes as number | undefined,
-    format: data.format as string | undefined,
-    resourceType: data.resource_type as string | undefined,
+  const attachment: FileAttachment = {
+    name: file.name || String(data.original_filename || data.public_id || "file"),
+    url: String(data.secure_url),
+    publicId: String(data.public_id),
     uploadedAt: new Date().toISOString(),
-    uploadedBy: options.uploadedBy,
   };
+
+  if (typeof data.bytes === "number") attachment.bytes = data.bytes;
+  if (typeof data.format === "string") attachment.format = data.format;
+  if (typeof data.resource_type === "string") {
+    attachment.resourceType = data.resource_type;
+  }
+  if (options.uploadedBy) attachment.uploadedBy = options.uploadedBy;
+
+  return attachment;
 }

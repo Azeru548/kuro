@@ -11,6 +11,7 @@ import {
   writeBatch,
   type Firestore,
 } from "firebase/firestore";
+import { sanitizeAttachments } from "@/lib/sanitize";
 import type {
   Bid,
   BidStatus,
@@ -223,7 +224,7 @@ export async function acceptBidAndCreateJob(
 
   await batch.commit();
 
-  const requestAttachments = request.attachments ?? [];
+  const requestAttachments = sanitizeAttachments(request.attachments ?? []);
 
   const jobPayload = {
     requestId: request.id,
@@ -282,7 +283,7 @@ export async function setJobDeliverables(
 ): Promise<void> {
   const now = new Date().toISOString();
   await updateDoc(doc(db, "jobs", jobId), {
-    deliverables,
+    deliverables: sanitizeAttachments(deliverables),
     updatedAt: now,
     updatedAtServer: serverTimestamp(),
   });
