@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
-import { canAccessRole } from "@/lib/firebase/users";
 import {
   BookOpen,
   Briefcase,
@@ -39,7 +38,7 @@ const helperNav: NavItem[] = [
   { href: "/helper/jobs", label: "My projects", icon: BookOpen },
   { href: "/helper/earnings", label: "Earnings", icon: Wallet },
   { href: "/helper/messages", label: "Messages", icon: MessageSquare },
-  { href: "/helper/profile", label: "Profile", icon: Settings },
+  { href: "/helper/settings", label: "Settings", icon: Settings },
 ];
 
 export function DashboardShell({
@@ -59,11 +58,11 @@ export function DashboardShell({
   const nav = role === "client" ? clientNav : helperNav;
 
   const displayName = profile?.displayName ?? "Guest";
+  // Helpers and clients stay on separate accounts; only admin / legacy "both" can switch
   const canSwitch =
-    !profile ||
-    profile.role === "both" ||
-    profile.role === "admin" ||
-    canAccessRole(profile.role, role === "client" ? "helper" : "client");
+    profile?.role === "admin" ||
+    profile?.role === "both" ||
+    (!firebaseReady && !profile);
 
   async function handleLogout() {
     await logOut();

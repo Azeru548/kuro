@@ -11,6 +11,7 @@ import { FileUploader } from "@/components/file-uploader";
 import { useAuth } from "@/contexts/auth-context";
 import { getFirebaseDb, isFirebaseConfigured } from "@/lib/firebase/client";
 import { createRequest } from "@/lib/firebase/requests";
+import { canCreateRequests } from "@/lib/firebase/users";
 import { REQUEST_CATEGORIES, type FileAttachment } from "@/lib/types";
 
 export default function NewRequestPage() {
@@ -54,6 +55,13 @@ export default function NewRequestPage() {
       return;
     }
 
+    if (!canCreateRequests(profile.role)) {
+      setError(
+        "Only client accounts can post requests. Sign up as a client if you need to hire help."
+      );
+      return;
+    }
+
     const db = getFirebaseDb();
     if (!db) {
       setError("Could not connect to Firestore.");
@@ -86,6 +94,28 @@ export default function NewRequestPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (profile && !canCreateRequests(profile.role)) {
+    return (
+      <DashboardShell
+        role="client"
+        title="Clients only"
+        subtitle="Helpers cannot post requests."
+      >
+        <Card className="max-w-lg">
+          <CardContent className="space-y-3 py-6 text-sm text-stone-600">
+            <p>
+              Helper accounts can only take jobs. To hire someone, create a{" "}
+              <strong>client</strong> account (or log into one).
+            </p>
+            <Button variant="outline" onClick={() => router.push("/helper")}>
+              Back to helper dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </DashboardShell>
+    );
   }
 
   return (

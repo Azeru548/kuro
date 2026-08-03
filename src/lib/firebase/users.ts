@@ -2,6 +2,7 @@ import {
   doc,
   getDoc,
   setDoc,
+  updateDoc,
   serverTimestamp,
   type Firestore,
 } from "firebase/firestore";
@@ -108,16 +109,37 @@ export async function ensureUserProfile(
   });
 }
 
+export async function updateUserDisplayName(
+  db: Firestore,
+  uid: string,
+  displayName: string
+): Promise<void> {
+  const name = displayName.trim();
+  if (!name) throw new Error("Display name is required.");
+  await updateDoc(doc(db, "users", uid), {
+    displayName: name,
+    updatedAt: serverTimestamp(),
+  });
+}
+
 export function defaultDashboardPath(role: UserRole): string {
   if (role === "helper") return "/helper";
   return "/client";
 }
 
+/** Clients hire help; helpers only take jobs — not dual unless admin/both legacy. */
 export function canAccessRole(
   userRole: UserRole,
   dashboard: "client" | "helper"
 ): boolean {
-  if (userRole === "admin" || userRole === "both") return true;
+  if (userRole === "admin") return true;
+  // Legacy "both" accounts keep access; new signups are client OR helper only
+  if (userRole === "both") return true;
   if (dashboard === "client") return userRole === "client";
   return userRole === "helper";
+}
+
+export function canCreateRequests(role: UserRole | undefined | null): boolean {
+  if (!role) return false;
+  return role === "client" || role === "both" || role === "admin";
 }

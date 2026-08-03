@@ -189,10 +189,16 @@ export default function ChooseHelpersPage() {
                   {activeCount} / {MAX_BIDS_PER_REQUEST} bids used
                 </Badge>
                 <Link
+                  href={`/client/requests/${requestId}/edit`}
+                  className="text-sm text-purple-700 hover:underline"
+                >
+                  Edit request
+                </Link>
+                <Link
                   href="/client/messages"
                   className="text-sm text-purple-700 hover:underline"
                 >
-                  Open messages
+                  Messages
                 </Link>
                 <Link
                   href="/client"

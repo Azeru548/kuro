@@ -106,7 +106,7 @@ export function AuthForm() {
             <p className="text-sm text-stone-500">
               {mode === "login"
                 ? "Log in to continue to your dashboard."
-                : "Join as a student, helper, or both."}
+                : "Join as a client (hire help) or a helper (take jobs). Separate accounts if you need both."}
             </p>
           </CardHeader>
           <CardContent>
@@ -136,19 +136,18 @@ export function AuthForm() {
                     <label className="mb-1.5 block text-sm text-stone-700">
                       I want to
                     </label>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       {(
                         [
-                          ["client", "Hire help"],
-                          ["helper", "Help others"],
-                          ["both", "Both"],
+                          ["client", "Client — hire help"],
+                          ["helper", "Helper — take jobs"],
                         ] as const
                       ).map(([value, label]) => (
                         <button
                           key={value}
                           type="button"
                           onClick={() => setRole(value)}
-                          className={`rounded-xl border px-2 py-2 text-xs transition ${
+                          className={`rounded-xl border px-2 py-2.5 text-xs transition ${
                             role === value
                               ? "border-purple-600 bg-purple-50 text-purple-900"
                               : "border-purple-100 text-stone-600 hover:border-purple-200"
@@ -158,6 +157,10 @@ export function AuthForm() {
                         </button>
                       ))}
                     </div>
+                    <p className="mt-2 text-[11px] text-stone-500">
+                      Only clients can post requests. Helpers use Settings for
+                      name, min price, and availability.
+                    </p>
                   </div>
                 </>
               ) : null}

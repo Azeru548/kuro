@@ -82,10 +82,10 @@ export default function HelperOverviewPage() {
             Open inbox
           </Button>
         </Link>
-        <Link href="/helper/profile">
+        <Link href="/helper/settings">
           <Button size="lg" variant="outline">
             <Settings className="h-4 w-4" />
-            Edit profile
+            Settings
           </Button>
         </Link>
       </div>

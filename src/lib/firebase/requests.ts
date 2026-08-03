@@ -7,6 +7,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  updateDoc,
   where,
   type Firestore,
 } from "firebase/firestore";
@@ -102,6 +103,69 @@ export async function getRequest(
   const snap = await getDoc(doc(db, "requests", requestId));
   if (!snap.exists()) return null;
   return mapRequest(snap.id, snap.data() as Record<string, unknown>);
+}
+
+/**
+ * Clients may edit their own open requests (details + price + attachments).
+ * Matched/in-progress requests cannot change price freely.
+ */
+export async function updateRequest(
+  db: Firestore,
+  params: {
+    requestId: string;
+    clientId: string;
+    title: string;
+    description: string;
+    category: string;
+    deadline: string;
+    offerPrice: number;
+    attachments?: FileAttachment[];
+  }
+): Promise<HelpRequest> {
+  const ref = doc(db, "requests", params.requestId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error("Request not found.");
+
+  const existing = mapRequest(snap.id, snap.data() as Record<string, unknown>);
+  if (existing.clientId !== params.clientId) {
+    throw new Error("You can only edit your own requests.");
+  }
+  if (existing.status !== "open") {
+    throw new Error(
+      "Only open requests can be edited. This one is already matched or closed."
+    );
+  }
+
+  const price = params.offerPrice;
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new Error("Enter a valid offer price.");
+  }
+
+  const attachments = sanitizeAttachments(
+    params.attachments ?? existing.attachments ?? []
+  );
+
+  await updateDoc(ref, {
+    title: params.title.trim(),
+    description: params.description.trim(),
+    category: params.category,
+    deadline: params.deadline,
+    offerPrice: price,
+    attachments,
+    attachmentNames: attachments.map((a) => a.name),
+    updatedAt: serverTimestamp(),
+  });
+
+  return {
+    ...existing,
+    title: params.title.trim(),
+    description: params.description.trim(),
+    category: params.category,
+    deadline: params.deadline,
+    offerPrice: price,
+    attachments,
+    attachmentNames: attachments.map((a) => a.name),
+  };
 }
 
 export async function listRequestsForClient(

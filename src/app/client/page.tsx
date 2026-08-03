@@ -142,12 +142,20 @@ export default function ClientOverviewPage() {
                       <RequestStatusBadge status={req.status} />
                     </div>
                     {req.status === "open" ? (
-                      <Link
-                        href={`/client/requests/${req.id}/helpers`}
-                        className="mt-3 inline-flex items-center gap-1 text-sm text-purple-700 hover:underline"
-                      >
-                        Choose helpers <ArrowRight className="h-3.5 w-3.5" />
-                      </Link>
+                      <div className="mt-3 flex flex-wrap gap-3 text-sm">
+                        <Link
+                          href={`/client/requests/${req.id}/helpers`}
+                          className="inline-flex items-center gap-1 text-purple-700 hover:underline"
+                        >
+                          Choose helpers <ArrowRight className="h-3.5 w-3.5" />
+                        </Link>
+                        <Link
+                          href={`/client/requests/${req.id}/edit`}
+                          className="text-stone-600 hover:text-purple-800 hover:underline"
+                        >
+                          Edit details / price
+                        </Link>
+                      </div>
                     ) : null}
                   </div>
                 ))
