@@ -7,3 +7,5 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  # Avoid optional platform packages from local Windows installs
+  NPM_FLAGS = "--include=dev"
